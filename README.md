@@ -18,6 +18,8 @@ CodeRoblox ist das Start-Repository fuer eine Codex-gestuetzte Roblox-Entwicklun
 - `src/coderoblox_agent`: lokaler Agent und HTTP-API
 - `plugin/src`: Roblox-Studio-Plugin
 - `plugin/tests`: Luau-Spezifikationstests, ausgefuehrt mit `lune`
+- `skills/coderoblox`: installierbarer Codex-Skill fuer dieses Repository
+- `CLAUDE.md`: Projektanweisungen fuer Claude
 - `.github/workflows/ci.yml`: Continuous Integration
 - `implementation_plan.md`: zugrunde liegendes Anforderungsdokument
 
@@ -85,6 +87,60 @@ Nach dem Neustart:
 
 ### 6. HTTP-Zugriff erlauben
 Das Plugin spricht ueber `HttpService` mit dem lokalen Agenten. Je nach Studio-Kontext musst du HTTP-Zugriff fuer das Projekt bzw. Plugin erlauben. Wenn Roblox Studio beim ersten Request nach einer Berechtigung fragt, diese bestaetigen.
+
+## Codex- und Claude-Skill installieren
+
+### Codex-Skill
+Im Repository liegt ein installierbarer Skill unter:
+
+```text
+skills/coderoblox
+```
+
+Installiere ihn, indem du den Ordner in dein Codex-Skill-Verzeichnis kopierst oder symlinkst:
+
+```text
+$CODEX_HOME/skills/coderoblox
+```
+
+Falls `CODEX_HOME` nicht gesetzt ist, ist der uebliche Standard:
+
+```text
+~/.codex/skills/coderoblox
+```
+
+Der Skill enthaelt:
+- repo-spezifische Arbeitsregeln
+- wichtige Dateien und Befehle
+- den Agent-Plugin-Workflow
+- Verifikationsschritte wie `make ci`
+
+### Claude
+Fuer Claude liegt die Projektanweisung in:
+
+```text
+CLAUDE.md
+```
+
+Wenn Claude mit dem Repository arbeitet, sollte diese Datei als projektlokale Arbeitsanweisung geladen werden.
+
+## Wie Plugin und Skill zusammenhaengen
+Wichtig ist die Trennung:
+- Das Roblox-Studio-Plugin ist die Laufzeitbruecke zu Roblox Studio.
+- Der lokale Agent ist die Laufzeitbruecke zwischen Studio und dem Repository.
+- Der Codex-Skill bzw. `CLAUDE.md` ist die Arbeitsanweisung fuer die AI.
+
+Das bedeutet:
+1. Das Plugin verbindet Roblox Studio mit dem lokalen Agenten.
+2. Der Skill erklaert Codex, wie dieses Repo aufgebaut ist und welche Befehle und Regeln gelten.
+3. Zusammen kann die AI zielgerichteter mit dem Plugin-Agent-Stack arbeiten.
+
+Praktisch verwendest du beides gemeinsam so:
+1. Codex-Skill installieren oder Claude mit `CLAUDE.md` arbeiten lassen.
+2. Lokalen Agent mit `python3 scripts/run_agent.py --host 127.0.0.1 --port 8787` starten.
+3. Plugin mit `make build-plugin` bauen und in Roblox Studio installieren.
+4. Plugin in Studio mit `http://127.0.0.1:8787` verbinden.
+5. Danach kann die AI repo-spezifisch arbeiten und die Studio-Verbindung gezielt nutzen.
 
 ## Lokale Entwicklung
 Checks ausfuehren:
