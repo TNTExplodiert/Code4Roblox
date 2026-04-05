@@ -32,6 +32,17 @@ CodeRoblox ist das Start-Repository fuer eine Codex-gestuetzte Roblox-Entwicklun
 ## Installation
 
 ### 1. Repository vorbereiten
+Arbeite im Repo und setze die lokalen Variablen so:
+
+```bash
+cd /pfad/zu/CodeRoblox
+source scripts/use-local-env.sh
+```
+
+Das Skript setzt:
+- `CODEROBLOX_ROOT` auf das aktuelle Repository
+- `CODEX_HOME` auf `${HOME}/.codex`, falls es nicht schon gesetzt ist
+
 Projekt-Tooling aktivieren und den lokalen `mise.toml` einmal als vertrauenswuerdig markieren:
 
 ```bash
@@ -48,22 +59,26 @@ make ci
 Der Plugin-Bridge-Server laeuft lokal auf Port `8787`:
 
 ```bash
+source scripts/use-local-env.sh
+cd "$CODEROBLOX_ROOT"
 python3 scripts/run_agent.py --host 127.0.0.1 --port 8787
 ```
 
-Unter WSL2 ist `127.0.0.1` in der Regel direkt von Roblox Studio unter Windows erreichbar.
+Verwende dafuer immer den sauberen WSL-Workspace und nicht einen gemischten Windows-/Linux-Pfad.
 
 ### 3. Plugin bauen
 Das Roblox-Plugin wird als lokale `.rbxm`-Datei erzeugt:
 
 ```bash
+source scripts/use-local-env.sh
+cd "$CODEROBLOX_ROOT"
 make build-plugin
 ```
 
 Danach liegt das Artefakt hier:
 
-```text
-build/CodeRobloxPlugin.rbxm
+```bash
+echo "$CODEROBLOX_ROOT/build/CodeRobloxPlugin.rbxm"
 ```
 
 ### 4. Plugin in Roblox Studio installieren
@@ -71,11 +86,11 @@ Empfohlener Weg:
 1. Roblox Studio starten.
 2. Einen beliebigen Place oeffnen.
 3. Den lokalen Plugin-Ordner in Studio oeffnen.
-4. Die Datei `build/CodeRobloxPlugin.rbxm` in den lokalen Plugin-Ordner kopieren.
+4. Die Datei aus `"$CODEROBLOX_ROOT/build/CodeRobloxPlugin.rbxm"` in den lokalen Plugin-Ordner kopieren.
 5. Roblox Studio neu starten.
 
 Alternative:
-1. `build/CodeRobloxPlugin.rbxm` in Studio importieren.
+1. Die Datei `"$CODEROBLOX_ROOT/build/CodeRobloxPlugin.rbxm"` in Studio importieren.
 2. Das importierte Plugin-Modell als lokalen Plugin-Eintrag speichern.
 
 ### 5. Plugin in Roblox Studio konfigurieren
@@ -91,22 +106,19 @@ Das Plugin spricht ueber `HttpService` mit dem lokalen Agenten. Je nach Studio-K
 ## Codex- und Claude-Skill installieren
 
 ### Codex-Skill
-Im Repository liegt ein installierbarer Skill unter:
+Im Repository liegt ein installierbarer Skill unter `skills/coderoblox`.
 
-```text
-skills/coderoblox
+Installieren:
+
+```bash
+source scripts/use-local-env.sh
+./scripts/install-codex-skill.sh
 ```
 
-Installiere ihn, indem du den Ordner in dein Codex-Skill-Verzeichnis kopierst oder symlinkst:
+Das Skript verlinkt den Skill nach:
 
-```text
-$CODEX_HOME/skills/coderoblox
-```
-
-Falls `CODEX_HOME` nicht gesetzt ist, ist der uebliche Standard:
-
-```text
-~/.codex/skills/coderoblox
+```bash
+echo "$CODEX_HOME/skills/coderoblox"
 ```
 
 Der Skill enthaelt:
@@ -116,11 +128,7 @@ Der Skill enthaelt:
 - Verifikationsschritte wie `make ci`
 
 ### Claude
-Fuer Claude liegt die Projektanweisung in:
-
-```text
-CLAUDE.md
-```
+Fuer Claude liegt die Projektanweisung in `CLAUDE.md`.
 
 Wenn Claude mit dem Repository arbeitet, sollte diese Datei als projektlokale Arbeitsanweisung geladen werden.
 
@@ -137,15 +145,18 @@ Das bedeutet:
 
 Praktisch verwendest du beides gemeinsam so:
 1. Codex-Skill installieren oder Claude mit `CLAUDE.md` arbeiten lassen.
-2. Lokalen Agent mit `python3 scripts/run_agent.py --host 127.0.0.1 --port 8787` starten.
-3. Plugin mit `make build-plugin` bauen und in Roblox Studio installieren.
-4. Plugin in Studio mit `http://127.0.0.1:8787` verbinden.
-5. Danach kann die AI repo-spezifisch arbeiten und die Studio-Verbindung gezielt nutzen.
+2. `source scripts/use-local-env.sh` ausfuehren.
+3. Den lokalen Agent mit `python3 scripts/run_agent.py --host 127.0.0.1 --port 8787` starten.
+4. Das Plugin mit `make build-plugin` bauen und in Roblox Studio installieren.
+5. Plugin in Studio mit `http://127.0.0.1:8787` verbinden.
+6. Danach kann die AI repo-spezifisch arbeiten und die Studio-Verbindung gezielt nutzen.
 
 ## Lokale Entwicklung
 Checks ausfuehren:
 
 ```bash
+source scripts/use-local-env.sh
+cd "$CODEROBLOX_ROOT"
 make lint
 make test
 make build-plugin

@@ -1,16 +1,17 @@
 # Install and Connection Notes
 
 ## Codex skill
-Install the repo skill by copying or symlinking `skills/coderoblox` into your Codex skills directory:
+Install the repo skill by linking `skills/coderoblox` into your Codex skills directory.
 
-```text
-$CODEX_HOME/skills/coderoblox
+```bash
+source scripts/use-local-env.sh
+./scripts/install-codex-skill.sh
 ```
 
-If `CODEX_HOME` is not set, the common default is:
+Installed location:
 
-```text
-~/.codex/skills/coderoblox
+```bash
+echo "$CODEX_HOME/skills/coderoblox"
 ```
 
 ## Claude

@@ -1,4 +1,4 @@
-# CodeRoblox Instructions for Claude
+# CodeRoblox Instructions for Codex
 
 Use this repository for CodeRoblox work: a local Python agent, a Roblox Studio plugin, and the protocol between them.
 

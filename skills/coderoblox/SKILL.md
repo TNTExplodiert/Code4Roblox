@@ -20,11 +20,13 @@ Use this skill for work on the CodeRoblox repo, especially when the task involve
 - Do not assume rollback, playtest automation, or diagnostics are fully implemented unless you verify and extend them.
 
 ## Runtime model
-1. The local agent runs on `http://127.0.0.1:8787`.
-2. The Roblox Studio plugin connects to that agent.
-3. The plugin pushes snapshots from Studio.
-4. The agent validates and queues operations.
-5. The plugin polls for batches and reports results back.
+1. Run `source scripts/use-local-env.sh`.
+2. Work from `$CODEROBLOX_ROOT`.
+3. The local agent runs on `http://127.0.0.1:8787`.
+4. The Roblox Studio plugin connects to that agent.
+5. The plugin pushes snapshots from Studio.
+6. The agent validates and queues operations.
+7. The plugin polls for batches and reports results back.
 
 ## Important paths
 - Agent entrypoint: `scripts/run_agent.py`

@@ -2,6 +2,8 @@
 
 ## Core verification
 ```bash
+source scripts/use-local-env.sh
+cd "$CODEROBLOX_ROOT"
 make lint
 make test
 make build-plugin
@@ -10,16 +12,20 @@ make ci
 
 ## Start the local agent
 ```bash
+source scripts/use-local-env.sh
+cd "$CODEROBLOX_ROOT"
 python3 scripts/run_agent.py --host 127.0.0.1 --port 8787
 ```
 
 ## Build the Roblox Studio plugin
 ```bash
+source scripts/use-local-env.sh
+cd "$CODEROBLOX_ROOT"
 make build-plugin
 ```
 
 Generated artifact:
 
-```text
-build/CodeRobloxPlugin.rbxm
+```bash
+echo "$CODEROBLOX_ROOT/build/CodeRobloxPlugin.rbxm"
 ```
