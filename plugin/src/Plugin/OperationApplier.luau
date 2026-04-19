@@ -1,8 +1,11 @@
 local ChangeHistoryService = game:GetService('ChangeHistoryService')
+local ScriptEditorService = game:GetService('ScriptEditorService')
+local TestService = game:GetService('TestService')
 
 local InstancePath = require(script.Parent.InstancePath)
 
 local OperationApplier = {}
+local appliedCheckpoints = {}
 
 local function isMutating(kind)
     return kind == 'apply_script_patch'
@@ -40,7 +43,14 @@ local function applyScriptPatch(operation)
     end
 
     local ok, err = pcall(function()
-        target.Source = operation.payload.script_source
+        local updateOk = pcall(function()
+            ScriptEditorService:UpdateSourceAsync(target, function()
+                return operation.payload.script_source
+            end)
+        end)
+        if not updateOk then
+            target.Source = operation.payload.script_source
+        end
     end)
     if not ok then
         return createOutcome(operation.operation_id, false, tostring(err), {})
@@ -51,6 +61,36 @@ local function applyScriptPatch(operation)
         true,
         'Patched script source.',
         { operation.target_path }
+    )
+end
+
+local function runPlaytest(operation)
+    local payload = operation.payload or {}
+    local durationSeconds = tonumber(payload.duration_seconds) or 0
+    local ok, err = pcall(function()
+        local runMethod = TestService.Run
+        if type(runMethod) ~= 'function' then
+            error('TestService.Run is not available in this Studio context.')
+        end
+        runMethod(TestService)
+        if durationSeconds > 0 then
+            task.wait(durationSeconds)
+        end
+    end)
+
+    if not ok then
+        return createOutcome(operation.operation_id, false, tostring(err), {})
+    end
+
+    return createOutcome(operation.operation_id, true, 'Started playtest run.', {})
+end
+
+local function collectOutput(operation)
+    return createOutcome(
+        operation.operation_id,
+        true,
+        'Output is available through snapshot sync.',
+        {}
     )
 end
 
@@ -134,13 +174,42 @@ local function createCheckpoint(operation)
 end
 
 local function rollbackCheckpoint(operation)
+    local checkpointId = tostring(operation.payload.checkpoint_id)
+    local targetIndex = nil
+
+    for index, checkpoint in ipairs(appliedCheckpoints) do
+        if checkpoint.checkpoint_id == checkpointId then
+            targetIndex = index
+        end
+    end
+
+    if targetIndex == nil then
+        return createOutcome(
+            operation.operation_id,
+            false,
+            string.format('Checkpoint %s is not available in this plugin session.', checkpointId),
+            {}
+        )
+    end
+
+    local undoSteps = (#appliedCheckpoints - targetIndex) * 2 + 1
+    for _ = 1, undoSteps do
+        local ok, err = pcall(function()
+            ChangeHistoryService:Undo()
+        end)
+        if not ok then
+            return createOutcome(operation.operation_id, false, tostring(err), {})
+        end
+    end
+
+    while #appliedCheckpoints >= targetIndex do
+        table.remove(appliedCheckpoints)
+    end
+
     return createOutcome(
         operation.operation_id,
-        false,
-        string.format(
-            'Rollback for checkpoint %s is not implemented yet.',
-            tostring(operation.payload.checkpoint_id)
-        ),
+        true,
+        string.format('Rolled back to checkpoint %s.', checkpointId),
         {}
     )
 end
@@ -148,6 +217,8 @@ end
 local handlers = {
     apply_script_patch = applyScriptPatch,
     create_instance = createInstance,
+    run_playtest = runPlaytest,
+    collect_output = collectOutput,
     update_properties = updateProperties,
     reparent_instance = reparentInstance,
     delete_instance = deleteInstance,
@@ -155,9 +226,11 @@ local handlers = {
     rollback_checkpoint = rollbackCheckpoint,
 }
 
-function OperationApplier.applyBatch(operations)
+function OperationApplier.applyBatch(batch)
+    local operations = batch.operations or batch
     local outcomes = {}
     local mutating = false
+    local checkpointId = batch.checkpoint_id
 
     for _, operation in ipairs(operations) do
         if isMutating(operation.kind) then
@@ -167,7 +240,10 @@ function OperationApplier.applyBatch(operations)
     end
 
     if mutating then
-        ChangeHistoryService:SetWaypoint('CodeRoblox before batch')
+        ChangeHistoryService:SetWaypoint(
+            checkpointId ~= nil and ('CodeRoblox checkpoint ' .. checkpointId)
+                or 'CodeRoblox before batch'
+        )
     end
 
     for _, operation in ipairs(operations) do
@@ -189,6 +265,12 @@ function OperationApplier.applyBatch(operations)
 
     if mutating then
         ChangeHistoryService:SetWaypoint('CodeRoblox after batch')
+        if checkpointId ~= nil then
+            table.insert(appliedCheckpoints, {
+                checkpoint_id = checkpointId,
+                batch_id = batch.batch_id,
+            })
+        end
     end
 
     return outcomes

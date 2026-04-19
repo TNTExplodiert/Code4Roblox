@@ -8,7 +8,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from coderoblox_agent.server import main  # noqa: E402
+from coderoblox_agent.runtime_http import main  # noqa: E402
 
 
 if __name__ == "__main__":

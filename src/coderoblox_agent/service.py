@@ -57,6 +57,13 @@ def source_digest(source: str) -> str:
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
+def session_execution_mode(session: SessionContext) -> str:
+    mode = str(session.capabilities.get("execution_mode", "auto_apply_safe"))
+    if mode in {"manual_review", "auto_apply", "auto_apply_safe"}:
+        return mode
+    return "auto_apply_safe"
+
+
 def enrich_snapshot(snapshot: ProjectSnapshot) -> ProjectSnapshot:
     unique_documents: dict[str, ScriptDocument] = {}
     for document in snapshot.script_documents:
@@ -206,6 +213,21 @@ class AgentService:
         return {
             "session_id": session_id,
             "audit_log": [entry.to_dict() for entry in entries],
+        }
+
+    def get_output(self, session_id: str, limit: int | None = None) -> dict[str, Any]:
+        snapshot = self._require_snapshot(session_id)
+        output_logs = list(snapshot.metadata.get("output_logs", []))
+        diagnostics = list(snapshot.diagnostics)
+
+        if limit is not None:
+            output_logs = output_logs[-limit:]
+            diagnostics = diagnostics[-limit:]
+
+        return {
+            "session_id": session_id,
+            "output_logs": output_logs,
+            "diagnostics": diagnostics,
         }
 
     def _require_snapshot(self, session_id: str) -> ProjectSnapshot:
@@ -527,7 +549,22 @@ class AgentService:
         if not validation["allowed"]:
             return {"queued": False, "validation": validation}
 
-        requires_approval = any(operation.kind in MUTATING_OPERATION_KINDS for operation in operations)
+        mode = session_execution_mode(session)
+        mutating_operations = [
+            operation for operation in operations if operation.kind in MUTATING_OPERATION_KINDS
+        ]
+        requires_approval = False
+        if mutating_operations:
+            if mode == "manual_review":
+                requires_approval = True
+            elif mode == "auto_apply":
+                requires_approval = False
+            else:
+                requires_approval = any(
+                    risk_for_kind(operation.kind).value == "high"
+                    or operation.kind in DESTRUCTIVE_OPERATION_KINDS
+                    for operation in mutating_operations
+                )
         checkpoint_id = None
 
         batch = OperationBatch(
@@ -548,7 +585,11 @@ class AgentService:
                     else AuditEventType.BATCH_QUEUED
                 ),
                 created_at=utc_now(),
-                details={"batch_id": batch.batch_id, "checkpoint_id": checkpoint_id},
+                details={
+                    "batch_id": batch.batch_id,
+                    "checkpoint_id": checkpoint_id,
+                    "execution_mode": mode,
+                },
             )
         )
         return {"queued": True, "validation": validation, "batch": batch.to_dict()}

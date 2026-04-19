@@ -56,6 +56,7 @@ class AgentServiceTests(unittest.TestCase):
         session = self.service.start_session(
             client_name="test-suite",
             project_root=str(self.project_root.resolve()),
+            capabilities={"execution_mode": "manual_review"},
         )
         self.session_id = session["session_id"]
         self.service.store_snapshot(self.session_id, make_snapshot())
@@ -172,6 +173,21 @@ class AgentServiceTests(unittest.TestCase):
         self.assertIn("batch_dispatched", event_types)
         self.assertIn("batch_completed", event_types)
 
+    def test_auto_apply_safe_queues_non_destructive_patch_without_review(self) -> None:
+        service = AgentService()
+        session = service.start_session(
+            client_name="auto-apply-suite",
+            project_root=str(self.project_root.resolve()),
+            capabilities={"execution_mode": "auto_apply_safe"},
+        )
+        service.store_snapshot(session["session_id"], make_snapshot())
+
+        result = service.queue_operations(session["session_id"], [patch_operation()])
+
+        self.assertTrue(result["queued"])
+        self.assertEqual(result["batch"]["status"], "queued")
+        self.assertFalse(result["batch"]["requires_approval"])
+
     def test_read_scripts_returns_latest_snapshot_documents(self) -> None:
         result = self.service.read_scripts(self.session_id, ["ReplicatedStorage/MyModule"])
 
@@ -197,6 +213,21 @@ class AgentServiceTests(unittest.TestCase):
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(manifest["script_count"], 1)
         self.assertEqual(manifest["scripts"][0]["mirror_path"], "scripts/ReplicatedStorage/MyModule.module.luau")
+
+    def test_output_endpoint_reads_snapshot_logs_and_diagnostics(self) -> None:
+        snapshot = self.service.get_snapshot(self.session_id)["snapshot"]
+        snapshot["diagnostics"] = [
+            {"severity": "warning", "message": "Something happened", "source": "roblox_output"}
+        ]
+        snapshot["metadata"]["output_logs"] = [
+            {"message": "Hello", "message_type": "Enum.MessageType.MessageOutput", "timestamp": 1}
+        ]
+        self.service.store_snapshot(self.session_id, ProjectSnapshot.from_dict(snapshot))
+
+        output = self.service.get_output(self.session_id)
+
+        self.assertEqual(output["output_logs"][0]["message"], "Hello")
+        self.assertEqual(output["diagnostics"][0]["severity"], "warning")
 
     def test_reject_batch_marks_it_rejected(self) -> None:
         result = self.service.queue_operations(self.session_id, [patch_operation()])

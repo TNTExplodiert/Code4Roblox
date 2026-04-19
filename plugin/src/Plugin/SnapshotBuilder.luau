@@ -1,4 +1,5 @@
 local Selection = game:GetService('Selection')
+local LogService = game:GetService('LogService')
 
 local InstancePath = require(script.Parent.InstancePath)
 
@@ -88,6 +89,57 @@ local function getProjectRoots()
     return roots
 end
 
+local function serializeLogEntry(entry)
+    if type(entry) ~= 'table' then
+        return nil
+    end
+
+    local messageType = entry.messageType or entry.MessageType or 'Output'
+    local message = entry.message or entry.Message or ''
+    local timestamp = entry.timestamp or entry.Timestamp or 0
+    return {
+        message = tostring(message),
+        message_type = tostring(messageType),
+        timestamp = tonumber(timestamp) or 0,
+    }
+end
+
+local function captureOutput()
+    local entries = {}
+    local diagnostics = {}
+    local ok, history = pcall(function()
+        return LogService:GetLogHistory()
+    end)
+
+    if not ok or type(history) ~= 'table' then
+        return entries, diagnostics
+    end
+
+    for _, rawEntry in ipairs(history) do
+        local entry = serializeLogEntry(rawEntry)
+        if entry ~= nil then
+            table.insert(entries, entry)
+            if string.find(entry.message_type, 'Error') ~= nil then
+                table.insert(diagnostics, {
+                    severity = 'error',
+                    source = 'roblox_output',
+                    message = entry.message,
+                    timestamp = entry.timestamp,
+                })
+            elseif string.find(entry.message_type, 'Warning') ~= nil then
+                table.insert(diagnostics, {
+                    severity = 'warning',
+                    source = 'roblox_output',
+                    message = entry.message,
+                    timestamp = entry.timestamp,
+                })
+            end
+        end
+    end
+
+    return entries, diagnostics
+end
+
 function SnapshotBuilder.buildSnapshot()
     local selected = Selection:Get()
     local selectedPaths = {}
@@ -95,6 +147,7 @@ function SnapshotBuilder.buildSnapshot()
     local selectionPaths = {}
     local selectionNodes = {}
     local scriptDocuments = {}
+    local outputLogs, diagnostics = captureOutput()
 
     for _, instance in ipairs(selected) do
         selectedPaths[InstancePath.getPath(instance)] = true
@@ -117,11 +170,12 @@ function SnapshotBuilder.buildSnapshot()
         nodes = nodes,
         selection_nodes = selectionNodes,
         script_documents = scriptDocuments,
-        diagnostics = {},
+        diagnostics = diagnostics,
         metadata = {
             root_service_count = #nodes,
             selected_count = #selectionPaths,
             script_count = #scriptDocuments,
+            output_logs = outputLogs,
         },
     }
 end

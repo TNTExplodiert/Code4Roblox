@@ -1,7 +1,7 @@
 # Anforderungsdokument: Codex-gestuetzte Roblox-Entwicklung mit Roblox-Studio-Plugin
 
 ## Kurzfassung
-Wir planen kein Bildschirm-Autopilot-System, sondern eine belastbare Studio-Integration ueber offizielle Roblox-Plugin-APIs plus einen lokalen Codex-Agent. Das ist der sauberste Weg, um Roblox-Spiele mit KI zu entwickeln, Aenderungen nachvollziehbar zu machen und das Fehlerrisiko niedrig zu halten.
+Wir planen kein Bildschirm-Autopilot-System, sondern eine belastbare Studio-Integration ueber offizielle Roblox-Plugin-APIs plus eine lokale Codex-Agent-Runtime. Das ist der sauberste Weg, um Roblox-Spiele mit KI zu entwickeln, Aenderungen nachvollziehbar zu machen und das Fehlerrisiko niedrig zu halten.
 
 Oeffentlich sichtbares Muster bei aehnlichen Tools:
 - Tools wie Catalyst beschreiben eine direkte Verbindung zwischen Web/App und Roblox Studio ueber ein Studio-Plugin mit automatischem Sync.
@@ -46,9 +46,9 @@ Verantwortung:
 - Reverse Engineering interner Studio-Protokolle
 - Headless-Compile als Primaermechanismus
 
-### 2. Lokaler Codex-Agent
+### 2. Lokale Codex-Agent-Runtime
 Verantwortung:
-- Bruecke zwischen Codex CLI/Desktop und Roblox Studio
+- Laufzeit und lokaler Endpunkt zwischen Codex CLI/Desktop und Roblox Studio
 - Lokaler Workspace als Source of Truth fuer Spezifikation, Prompts, Snapshots und optional dateibasierte Roblox-Projekte
 - Uebersetzung zwischen natuerlicher Sprache und strukturierten Studio-Operationen
 - Validierung vor Ausfuehrung:
@@ -58,7 +58,7 @@ Verantwortung:
 - Sitzungsverwaltung, Projektkontext, Verlauf und Rollback-Metadaten
 
 #### Empfohlene v1-Topologie
-`Codex <-> lokaler Agent <-> Roblox-Studio-Plugin`
+`Codex <-> lokale Agent-Runtime <-> Roblox-Studio-Plugin`
 
 Cloud optional nur fuer Modellaufrufe, nicht fuer Studio-Dateizugriff oder Primaersteuerung.
 
@@ -126,7 +126,7 @@ Fuer v1 sollte das System sowohl Studio-first als auch dateibasiert funktioniere
 
 ## Oeffentliche Schnittstellen und Artefakte
 Zu spezifizieren sind:
-- Plugin-zu-Agent-Protokoll
+- Plugin-zu-Agent-Runtime-Protokoll
   - Auth oder Session-Handshake
   - Snapshot-Schema
   - Operations-Schema
@@ -134,7 +134,7 @@ Zu spezifizieren sind:
 - Lokales Projektmanifest
   - Roblox-Projektbindung
   - Universe- und Place-Metadaten
-  - Plugin-Agent-Endpunkt
+  - lokaler Agent-Endpunkt
   - Feature-Flags
 - Checkpoint- und Rollback-Modell
 - Prompt-Kontextvertrag
@@ -171,7 +171,7 @@ Zu spezifizieren sind:
 
 ## Annahmen und getroffene Entscheidungen
 - v1 umfasst volle Studio-Steuerung im Sinn deklarativer DataModel-Operationen, nicht GUI-Autopilot.
-- Verbindung erfolgt lokal ueber einen Desktop- oder CLI-Agent.
+- Verbindung erfolgt lokal ueber die Agent-Runtime des Desktop- oder CLI-Agents.
 - Wir stuetzen uns ausschliesslich auf offizielle Roblox-Mechanismen.
 - Automatisch kompilieren wird in v1 durch Validierung, Diagnostics und Playtest ersetzt.
 - Publish oder Deployment ist nachrangig und darf erst nach stabiler Authoring-Schicht kommen.

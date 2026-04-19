@@ -79,6 +79,16 @@ def build_handler() -> type[BaseHTTPRequestHandler]:
                 )
                 return
 
+            if parsed.path == "/api/output":
+                session_id = self._require_query_value(query, "session_id")
+                limit = query.get("limit")
+                parsed_limit = int(limit[0]) if limit else None
+                self._handle(
+                    lambda: self.server.service.get_output(session_id, parsed_limit),
+                    HTTPStatus.OK,
+                )
+                return
+
             if parsed.path == "/api/operations/pending":
                 session_id = self._require_query_value(query, "session_id")
                 self._handle(
@@ -253,7 +263,9 @@ def build_handler() -> type[BaseHTTPRequestHandler]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run the CodeRoblox local orchestration agent.")
+    parser = argparse.ArgumentParser(
+        description="Run the CodeRoblox local agent runtime HTTP endpoint."
+    )
     parser.add_argument("--host", default="127.0.0.1", help="Host interface to bind to.")
     parser.add_argument("--port", default=8787, type=int, help="Port to listen on.")
     args = parser.parse_args(argv)

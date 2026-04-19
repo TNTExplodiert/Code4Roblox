@@ -15,6 +15,7 @@ if (Test-Path $target) {
     Remove-Item -LiteralPath $target -Recurse -Force
 }
 
-New-Item -ItemType SymbolicLink -Path $target -Target $source | Out-Null
+New-Item -ItemType Directory -Force -Path $target | Out-Null
+Copy-Item -Path (Join-Path $source '*') -Destination $target -Recurse -Force
 
 Write-Host "Installed Codex skill at $target"

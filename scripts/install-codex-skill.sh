@@ -7,6 +7,7 @@ export CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 
 mkdir -p "$CODEX_HOME/skills"
 rm -rf "$CODEX_HOME/skills/coderoblox"
-ln -s "$CODEROBLOX_ROOT/skills/coderoblox" "$CODEX_HOME/skills/coderoblox"
+mkdir -p "$CODEX_HOME/skills/coderoblox"
+cp -R "$CODEROBLOX_ROOT/skills/coderoblox/." "$CODEX_HOME/skills/coderoblox"
 
 echo "Installed Codex skill at $CODEX_HOME/skills/coderoblox"

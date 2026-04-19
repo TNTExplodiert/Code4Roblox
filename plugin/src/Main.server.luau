@@ -1,16 +1,17 @@
 local PluginHandle = plugin
 
-local AgentClient = require(script.Plugin.AgentClient)
-local OperationApplier = require(script.Plugin.OperationApplier)
-local Settings = require(script.Plugin.Settings)
-local SnapshotBuilder = require(script.Plugin.SnapshotBuilder)
-local OperationPreview = require(script.Shared.OperationPreview)
-local Protocol = require(script.Shared.Protocol)
+local AgentClient = require(script.Parent.Plugin.AgentClient)
+local OperationApplier = require(script.Parent.Plugin.OperationApplier)
+local Settings = require(script.Parent.Plugin.Settings)
+local SnapshotBuilder = require(script.Parent.Plugin.SnapshotBuilder)
+local OperationPreview = require(script.Parent.Shared.OperationPreview)
+local Protocol = require(script.Parent.Shared.Protocol)
 
 local state = {
     agentUrl = Settings.get(PluginHandle, 'agent_url', 'http://127.0.0.1:8787'),
     projectRoot = Settings.get(PluginHandle, 'project_root', ''),
     sessionId = Settings.get(PluginHandle, 'session_id', nil),
+    executionMode = Settings.get(PluginHandle, 'execution_mode', 'auto_apply_safe'),
     polling = false,
     pendingBatch = nil,
 }
@@ -19,10 +20,13 @@ local toolbar = PluginHandle:CreateToolbar('CodeRoblox')
 local toggleButton = toolbar:CreateButton('CodeRoblox', 'Open the CodeRoblox control panel.', '')
 
 local widgetInfo =
-    DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Left, true, false, 420, 460, 360, 360)
+    DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Left, true, true, 420, 460, 360, 360)
 
 local widget = PluginHandle:CreateDockWidgetPluginGui('CodeRobloxWidget', widgetInfo)
 widget.Title = 'CodeRoblox'
+widget.Enabled = false
+
+warn('CodeRoblox plugin loaded')
 
 local root = Instance.new('Frame')
 root.Name = 'Root'
@@ -63,6 +67,15 @@ statusLabel.Font = Enum.Font.BuilderSans
 statusLabel.TextSize = 16
 statusLabel.Text = 'Not connected'
 statusLabel.Parent = root
+
+local agentUrlLabel = Instance.new('TextLabel')
+agentUrlLabel.Size = UDim2.new(1, 0, 0, 20)
+agentUrlLabel.BackgroundTransparency = 1
+agentUrlLabel.TextXAlignment = Enum.TextXAlignment.Left
+agentUrlLabel.Font = Enum.Font.BuilderSans
+agentUrlLabel.TextSize = 14
+agentUrlLabel.Text = 'Agent URL'
+agentUrlLabel.Parent = root
 
 local agentUrlBox = Instance.new('TextBox')
 agentUrlBox.Size = UDim2.new(1, 0, 0, 32)
@@ -215,11 +228,13 @@ local function ensureSession()
             script_documents = true,
             queue_polling = true,
             approval_gate = true,
+            execution_mode = state.executionMode,
             apply_script_patch = true,
             create_instance = true,
             update_properties = true,
             reparent_instance = true,
             delete_instance = true,
+            run_playtest = true,
         },
     })
 
@@ -282,7 +297,7 @@ local function pollLoop()
 
                     if ok and batch ~= nil and batch.batch ~= nil then
                         local batchPayload = batch.batch
-                        local outcomes = OperationApplier.applyBatch(batchPayload.operations)
+                        local outcomes = OperationApplier.applyBatch(batchPayload)
                         local success, result = pcall(function()
                             return makeClient():reportBatchResult(
                                 state.sessionId,
@@ -325,7 +340,9 @@ end
 setPendingBatch(nil)
 
 toggleButton.Click:Connect(function()
+    warn(string.format('CodeRoblox toolbar clicked (widget.Enabled=%s)', tostring(widget.Enabled)))
     widget.Enabled = not widget.Enabled
+    setStatus(widget.Enabled and 'Plugin window opened' or 'Plugin window hidden')
 end)
 
 agentUrlBox.FocusLost:Connect(function(enterPressed)

@@ -8,7 +8,7 @@ import unittest
 from urllib import parse, request
 from pathlib import Path
 
-from coderoblox_agent.server import JsonHttpServer
+from coderoblox_agent.runtime_http import JsonHttpServer
 from coderoblox_agent.service import AgentService
 
 
@@ -24,23 +24,23 @@ def json_request(url: str, method: str = "GET", payload: dict | None = None) -> 
         return json.loads(response.read().decode("utf-8"))
 
 
-class AgentServerTests(unittest.TestCase):
+class AgentRuntimeHttpTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temp_root = Path("test_artifacts") / "server"
+        self.temp_root = Path("test_artifacts") / "runtime_http"
         self.temp_root.mkdir(parents=True, exist_ok=True)
         self.project_root = self.temp_root / "workspace"
         if self.project_root.exists():
             shutil.rmtree(self.project_root)
         self.project_root.mkdir(parents=True, exist_ok=True)
-        self.server = JsonHttpServer(("127.0.0.1", 0), AgentService())
-        host, port = self.server.server_address
+        self.http_runtime = JsonHttpServer(("127.0.0.1", 0), AgentService())
+        host, port = self.http_runtime.server_address
         self.base_url = f"http://{host}:{port}"
-        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread = threading.Thread(target=self.http_runtime.serve_forever, daemon=True)
         self.thread.start()
 
     def tearDown(self) -> None:
-        self.server.shutdown()
-        self.server.server_close()
+        self.http_runtime.shutdown()
+        self.http_runtime.server_close()
         self.thread.join(timeout=5)
         if self.temp_root.exists():
             shutil.rmtree(self.temp_root)
@@ -59,6 +59,7 @@ class AgentServerTests(unittest.TestCase):
             payload={
                 "client_name": "studio-plugin",
                 "project_root": str(self.project_root.resolve()),
+                "capabilities": {"execution_mode": "manual_review"},
             },
         )
         session_id = session["session_id"]
@@ -112,6 +113,12 @@ class AgentServerTests(unittest.TestCase):
         self.assertEqual(scripts["scripts"][0]["source"], "return 1")
         self.assertTrue(scripts["scripts"][0]["source_sha256"])
 
+        output = json_request(
+            f"{self.base_url}/api/output?session_id={parse.quote(session_id)}"
+        )
+        self.assertIn("output_logs", output)
+        self.assertIn("diagnostics", output)
+
         queue_result = json_request(
             f"{self.base_url}/api/operations/queue",
             method="POST",
@@ -147,7 +154,7 @@ class AgentServerTests(unittest.TestCase):
             payload={
                 "session_id": session_id,
                 "batch_id": batch["batch_id"],
-                "note": "approved in server test",
+                "note": "approved in runtime endpoint test",
             },
         )
         self.assertEqual(approved["batch"]["status"], "queued")
