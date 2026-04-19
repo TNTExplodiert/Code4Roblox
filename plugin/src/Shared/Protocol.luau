@@ -20,6 +20,13 @@ local destructiveKinds = {
     rollback_checkpoint = true,
 }
 
+local readOnlyKinds = {
+    get_project_snapshot = true,
+    get_selection = true,
+    read_scripts = true,
+    collect_output = true,
+}
+
 local riskByKind = {
     delete_instance = 'high',
     rollback_checkpoint = 'high',
@@ -36,6 +43,14 @@ end
 
 function Protocol.isDestructive(kind)
     return destructiveKinds[kind] == true
+end
+
+function Protocol.isReadOnly(kind)
+    return readOnlyKinds[kind] == true
+end
+
+function Protocol.requiresApproval(kind)
+    return Protocol.isReadOnly(kind) == false
 end
 
 function Protocol.riskForKind(kind)

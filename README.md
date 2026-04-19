@@ -9,8 +9,8 @@ CodeRoblox ist das Start-Repository fuer eine Codex-gestuetzte Roblox-Entwicklun
 
 ## Aktueller Stand
 - initiales Anforderungsdokument: `implementation_plan.md`
-- lokaler Python-Agent fuer Sessions, Snapshots, Checkpoints und Operations-Queues
-- Roblox-Studio-Plugin-Grundgeruest mit Snapshot-Push und Batch-Polling
+- lokaler Python-Agent fuer Sessions, Snapshots, Script-Dokumente, lokalen Mirror, Checkpoints, Approval-Gates und Operations-Queues
+- Roblox-Studio-Plugin mit Kontext-Sync, Pending-Plan-Vorschau und Freigabe vor mutierenden Aenderungen
 - Testfaelle fuer Agent-Logik und Luau-Hilfsmodule
 - GitHub Actions CI fuer Lint, Tests und Plugin-Build
 
@@ -32,11 +32,27 @@ CodeRoblox ist das Start-Repository fuer eine Codex-gestuetzte Roblox-Entwicklun
 ## Installation
 
 ### 1. Repository vorbereiten
-Arbeite im Repo und setze die lokalen Variablen so:
+Arbeite im Repo und setze die lokalen Variablen passend zu deiner Shell.
+
+Bash / WSL:
 
 ```bash
 cd /pfad/zu/CodeRoblox
 source scripts/use-local-env.sh
+```
+
+PowerShell unter Windows:
+
+```powershell
+Set-Location C:\Users\tom\Documents\GitHub\Code4Roblox
+. .\scripts\use-local-env.ps1
+```
+
+Falls PowerShell lokale Skripte blockiert, reicht fuer die aktuelle Sitzung:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+. .\scripts\use-local-env.ps1
 ```
 
 Das Skript setzt:
@@ -56,7 +72,9 @@ make ci
 ```
 
 ### 2. Lokalen Agent starten
-Der Plugin-Bridge-Server laeuft lokal auf Port `8787`:
+Der Plugin-Bridge-Server laeuft lokal auf Port `8787`.
+
+Bash / WSL:
 
 ```bash
 source scripts/use-local-env.sh
@@ -64,7 +82,13 @@ cd "$CODEROBLOX_ROOT"
 python3 scripts/run_agent.py --host 127.0.0.1 --port 8787
 ```
 
-Verwende dafuer immer den sauberen WSL-Workspace und nicht einen gemischten Windows-/Linux-Pfad.
+PowerShell:
+
+```powershell
+. .\scripts\use-local-env.ps1
+Set-Location $env:CODEROBLOX_ROOT
+python .\scripts\run_agent.py --host 127.0.0.1 --port 8787
+```
 
 ### 3. Plugin bauen
 Das Roblox-Plugin wird als lokale `.rbxm`-Datei erzeugt:
@@ -79,6 +103,12 @@ Danach liegt das Artefakt hier:
 
 ```bash
 echo "$CODEROBLOX_ROOT/build/CodeRobloxPlugin.rbxm"
+```
+
+In PowerShell entspricht das lokal diesem Pfad:
+
+```powershell
+$env:CODEROBLOX_ROOT\build\CodeRobloxPlugin.rbxm
 ```
 
 ### 4. Plugin in Roblox Studio installieren
@@ -110,9 +140,18 @@ Im Repository liegt ein installierbarer Skill unter `skills/coderoblox`.
 
 Installieren:
 
+Bash / WSL:
+
 ```bash
 source scripts/use-local-env.sh
 ./scripts/install-codex-skill.sh
+```
+
+PowerShell:
+
+```powershell
+. .\scripts\use-local-env.ps1
+. .\scripts\install-codex-skill.ps1
 ```
 
 Das Skript verlinkt den Skill nach:
@@ -140,8 +179,9 @@ Wichtig ist die Trennung:
 
 Das bedeutet:
 1. Das Plugin verbindet Roblox Studio mit dem lokalen Agenten.
-2. Der Skill erklaert Codex, wie dieses Repo aufgebaut ist und welche Befehle und Regeln gelten.
-3. Zusammen kann die AI zielgerichteter mit dem Plugin-Agent-Stack arbeiten.
+2. Der lokale Agent stellt der externen KI Snapshots, Script-Dokumente, Audit-Infos, lokalen Mirror, Validierung und Queueing bereit.
+3. Der Skill erklaert Codex oder Claude, wie mit diesem Kontext geplant und wie sicher in Studio angewendet wird.
+4. Zusammen kann die AI zielgerichteter mit dem Plugin-Agent-Stack arbeiten.
 
 Praktisch verwendest du beides gemeinsam so:
 1. Codex-Skill installieren oder Claude mit `CLAUDE.md` arbeiten lassen.
@@ -154,6 +194,8 @@ Praktisch verwendest du beides gemeinsam so:
 ## Lokale Entwicklung
 Checks ausfuehren:
 
+Bash / WSL:
+
 ```bash
 source scripts/use-local-env.sh
 cd "$CODEROBLOX_ROOT"
@@ -163,11 +205,44 @@ make build-plugin
 make ci
 ```
 
+PowerShell:
+
+```powershell
+. .\scripts\use-local-env.ps1
+Set-Location $env:CODEROBLOX_ROOT
+make lint
+make test
+make build-plugin
+make ci
+```
+
 ## Implementierter Workflow
 1. Das Studio-Plugin verbindet sich mit dem lokalen Agenten und startet eine Session.
-2. Das Plugin uebertraegt Snapshot-Daten aus Roblox Studio.
-3. Der Agent validiert und queue-t aendernde Operationen mit Checkpoints.
-4. Das Plugin pollt neue Batches, wendet unterstuetzte Operationen an und meldet Resultate zurueck.
+2. Das Plugin synchronisiert Studio-Kontext als Snapshot plus Script-Dokumente.
+3. Der Agent schreibt daraus einen lokalen Mirror unter `studio_mirror/<projektname>/`, inklusive `snapshot.json`, `mirror_manifest.json` und versionierbaren Luau-Dateien.
+4. Die externe KI liest diesen Kontext ueber den lokalen Agenten und kann zusaetzlich den lokalen Mirror fuer Git, Diff und Dateibearbeitung nutzen.
+5. Die externe KI plant strukturierte Operationen.
+6. Der Agent validiert Operationen und legt mutierende Batches zunaechst als `pending_approval` ab.
+7. Das Plugin zeigt Pending-Plans an, der Nutzer gibt frei oder lehnt ab.
+8. Nur freigegebene Batches werden angewendet, danach meldet das Plugin Resultate zurueck und synchronisiert den aktuellen Studio-Zustand erneut.
+
+## Lokaler Mirror
+Nach jedem Snapshot-Sync schreibt der Agent einen git-freundlichen Spiegel des Studio-Zustands nach:
+
+```text
+studio_mirror/<projektname>/
+  mirror_manifest.json
+  snapshot.json
+  scripts/
+```
+
+Die Skripte werden dabei nach Roblox-Pfaden abgelegt, zum Beispiel:
+
+```text
+studio_mirror/MyPlace/scripts/ReplicatedStorage/MyModule.module.luau
+```
+
+Der Mirror ist dafuer gedacht, von Codex oder Claude gelesen, gedifft und optional in Git versioniert zu werden.
 
 ## Bekannte Grenzen des aktuellen Stands
 - `rollback_checkpoint` ist im Plugin noch als explizites TODO markiert.

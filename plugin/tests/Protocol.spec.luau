@@ -16,6 +16,9 @@ return function()
 
     assert(Protocol.isOperationEnvelope(validEnvelope))
     assert(Protocol.isDestructive('delete_instance') == true)
+    assert(Protocol.isReadOnly('read_scripts') == true)
+    assert(Protocol.requiresApproval('apply_script_patch') == true)
+    assert(Protocol.requiresApproval('read_scripts') == false)
     assert(Protocol.riskForKind('delete_instance') == 'high')
     assert(Protocol.riskForKind('read_scripts') == 'low')
 

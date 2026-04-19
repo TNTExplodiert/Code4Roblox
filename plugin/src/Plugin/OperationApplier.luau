@@ -4,6 +4,16 @@ local InstancePath = require(script.Parent.InstancePath)
 
 local OperationApplier = {}
 
+local function isMutating(kind)
+    return kind == 'apply_script_patch'
+        or kind == 'create_instance'
+        or kind == 'update_properties'
+        or kind == 'reparent_instance'
+        or kind == 'delete_instance'
+        or kind == 'create_checkpoint'
+        or kind == 'rollback_checkpoint'
+end
+
 local function createOutcome(operationId, success, message, changedPaths)
     return {
         operation_id = operationId,
@@ -17,6 +27,16 @@ local function applyScriptPatch(operation)
     local target = InstancePath.findByPath(operation.target_path)
     if target == nil or not target:IsA('LuaSourceContainer') then
         return createOutcome(operation.operation_id, false, 'Script target not found.', {})
+    end
+
+    local expectedSource = operation.preconditions.expected_source
+    if expectedSource ~= nil and target.Source ~= expectedSource then
+        return createOutcome(
+            operation.operation_id,
+            false,
+            'Script source changed since the plan was created. Refresh context and re-plan.',
+            {}
+        )
     end
 
     local ok, err = pcall(function()
@@ -137,6 +157,18 @@ local handlers = {
 
 function OperationApplier.applyBatch(operations)
     local outcomes = {}
+    local mutating = false
+
+    for _, operation in ipairs(operations) do
+        if isMutating(operation.kind) then
+            mutating = true
+            break
+        end
+    end
+
+    if mutating then
+        ChangeHistoryService:SetWaypoint('CodeRoblox before batch')
+    end
 
     for _, operation in ipairs(operations) do
         local handler = handlers[operation.kind]
@@ -153,6 +185,10 @@ function OperationApplier.applyBatch(operations)
         else
             table.insert(outcomes, handler(operation))
         end
+    end
+
+    if mutating then
+        ChangeHistoryService:SetWaypoint('CodeRoblox after batch')
     end
 
     return outcomes

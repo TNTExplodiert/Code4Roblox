@@ -14,6 +14,14 @@ Installed location:
 echo "$CODEX_HOME/skills/coderoblox"
 ```
 
+PowerShell:
+
+```powershell
+. .\scripts\use-local-env.ps1
+. .\scripts\install-codex-skill.ps1
+$env:CODEX_HOME\skills\coderoblox
+```
+
 ## Claude
 Claude does not use the Codex skill format directly. Use the repository `CLAUDE.md` as the project instruction file.
 

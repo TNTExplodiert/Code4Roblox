@@ -27,6 +27,26 @@ function AgentClient:createCheckpoint(sessionId, label)
     })
 end
 
+function AgentClient:getPendingBatch(sessionId)
+    return self.http:get(string.format('/api/operations/pending?session_id=%s', sessionId))
+end
+
+function AgentClient:approveBatch(sessionId, batchId, note)
+    return self.http:post('/api/operations/approve', {
+        session_id = sessionId,
+        batch_id = batchId,
+        note = note or '',
+    })
+end
+
+function AgentClient:rejectBatch(sessionId, batchId, reason)
+    return self.http:post('/api/operations/reject', {
+        session_id = sessionId,
+        batch_id = batchId,
+        reason = reason or '',
+    })
+end
+
 function AgentClient:nextBatch(sessionId)
     return self.http:get(string.format('/api/operations/next?session_id=%s', sessionId))
 end

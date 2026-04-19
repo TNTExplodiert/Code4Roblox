@@ -32,6 +32,61 @@ def build_handler() -> type[BaseHTTPRequestHandler]:
                 self._write_json(HTTPStatus.OK, self.server.service.health())
                 return
 
+            if parsed.path == "/api/sessions":
+                session_id = self._require_query_value(query, "session_id")
+                self._handle(
+                    lambda: self.server.service.get_session_summary(session_id),
+                    HTTPStatus.OK,
+                )
+                return
+
+            if parsed.path == "/api/snapshots/latest":
+                session_id = self._require_query_value(query, "session_id")
+                self._handle(
+                    lambda: self.server.service.get_snapshot(session_id),
+                    HTTPStatus.OK,
+                )
+                return
+
+            if parsed.path == "/api/mirror":
+                session_id = self._require_query_value(query, "session_id")
+                self._handle(
+                    lambda: self.server.service.get_mirror_status(session_id),
+                    HTTPStatus.OK,
+                )
+                return
+
+            if parsed.path == "/api/scripts":
+                session_id = self._require_query_value(query, "session_id")
+                include_source = self._parse_bool_query(query, "include_source", True)
+                self._handle(
+                    lambda: self.server.service.read_scripts(
+                        session_id=session_id,
+                        paths=query.get("path"),
+                        include_source=include_source,
+                    ),
+                    HTTPStatus.OK,
+                )
+                return
+
+            if parsed.path == "/api/audit":
+                session_id = self._require_query_value(query, "session_id")
+                limit = query.get("limit")
+                parsed_limit = int(limit[0]) if limit else None
+                self._handle(
+                    lambda: self.server.service.get_audit_log(session_id, parsed_limit),
+                    HTTPStatus.OK,
+                )
+                return
+
+            if parsed.path == "/api/operations/pending":
+                session_id = self._require_query_value(query, "session_id")
+                self._handle(
+                    lambda: self.server.service.get_pending_batch(session_id),
+                    HTTPStatus.OK,
+                )
+                return
+
             if parsed.path == "/api/operations/next":
                 session_id = self._require_query_value(query, "session_id")
                 self._handle(
@@ -86,6 +141,22 @@ def build_handler() -> type[BaseHTTPRequestHandler]:
                         outcomes=[
                             OperationOutcome.from_dict(item) for item in body.get("outcomes", [])
                         ],
+                    ),
+                ),
+                "/api/operations/approve": (
+                    HTTPStatus.OK,
+                    lambda: self.server.service.approve_batch(
+                        session_id=str(body["session_id"]),
+                        batch_id=str(body["batch_id"]),
+                        note=str(body.get("note", "")),
+                    ),
+                ),
+                "/api/operations/reject": (
+                    HTTPStatus.OK,
+                    lambda: self.server.service.reject_batch(
+                        session_id=str(body["session_id"]),
+                        batch_id=str(body["batch_id"]),
+                        reason=str(body.get("reason", "")),
                     ),
                 ),
                 "/api/checkpoints": (
@@ -155,6 +226,20 @@ def build_handler() -> type[BaseHTTPRequestHandler]:
             if default is not None:
                 return default
             raise AgentError(f"Missing query parameter: {key}")
+
+        def _parse_bool_query(
+            self, query: dict[str, list[str]], key: str, default: bool
+        ) -> bool:
+            values = query.get(key)
+            if not values:
+                return default
+
+            value = values[0].strip().lower()
+            if value in {"1", "true", "yes"}:
+                return True
+            if value in {"0", "false", "no"}:
+                return False
+            raise AgentError(f"Invalid boolean query parameter: {key}")
 
         def _write_json(self, status_code: HTTPStatus, payload: dict[str, Any]) -> None:
             body = json.dumps(payload).encode("utf-8")

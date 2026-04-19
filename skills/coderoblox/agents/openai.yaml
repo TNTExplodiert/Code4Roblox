@@ -1,4 +1,4 @@
 interface:
   display_name: "CodeRoblox"
   short_description: "Work in the CodeRoblox repo and coordinate the Roblox plugin with the local agent"
-  default_prompt: "Use the CodeRoblox workflow: keep the Python agent and Luau protocol in sync, verify changes with make ci, rebuild the plugin when needed, and explain any Roblox Studio setup steps clearly."
+  default_prompt: "Use the CodeRoblox workflow: the external AI does the planning, the local agent provides Studio context plus a local git-friendly mirror plus validation and queueing, and the plugin handles review plus execution. Sync Studio context first, read the latest snapshot and scripts before planning, prefer the local mirror for file inspection when available, queue structured operations with patch preconditions, and assume mutating work requires plugin approval before apply."

@@ -29,3 +29,20 @@ Generated artifact:
 ```bash
 echo "$CODEROBLOX_ROOT/build/CodeRobloxPlugin.rbxm"
 ```
+
+PowerShell equivalents:
+
+```powershell
+. .\scripts\use-local-env.ps1
+Set-Location $env:CODEROBLOX_ROOT
+make lint
+make test
+make build-plugin
+make ci
+
+python .\scripts\run_agent.py --host 127.0.0.1 --port 8787
+
+make build-plugin
+
+$env:CODEROBLOX_ROOT\build\CodeRobloxPlugin.rbxm
+```
