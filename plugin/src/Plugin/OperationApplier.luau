@@ -7,6 +7,120 @@ local InstancePath = require(script.Parent.InstancePath)
 local OperationApplier = {}
 local appliedCheckpoints = {}
 
+local function isArray(value)
+    if type(value) ~= 'table' then
+        return false
+    end
+
+    local expectedIndex = 1
+    for key in pairs(value) do
+        if type(key) ~= 'number' or key ~= expectedIndex then
+            return false
+        end
+        expectedIndex += 1
+    end
+
+    return true
+end
+
+local function toVector3(value)
+    if type(value) ~= 'table' then
+        return nil
+    end
+
+    local x = tonumber(value.X)
+    local y = tonumber(value.Y)
+    local z = tonumber(value.Z)
+    if x == nil or y == nil or z == nil then
+        return nil
+    end
+
+    return Vector3.new(x, y, z)
+end
+
+local function toColor3(value)
+    if type(value) ~= 'table' then
+        return nil
+    end
+
+    local r = tonumber(value.R)
+    local g = tonumber(value.G)
+    local b = tonumber(value.B)
+    if r == nil or g == nil or b == nil then
+        return nil
+    end
+
+    if r > 1 or g > 1 or b > 1 then
+        return Color3.fromRGB(r, g, b)
+    end
+
+    return Color3.new(r, g, b)
+end
+
+local function decodeValue(value)
+    if type(value) ~= 'table' then
+        return value
+    end
+
+    local typedValue = value.type
+    if typedValue == 'Vector3' then
+        return assert(toVector3(value.value or value), 'Invalid Vector3 payload.')
+    end
+    if typedValue == 'Color3' then
+        return assert(toColor3(value.value or value), 'Invalid Color3 payload.')
+    end
+    if typedValue == 'CFrame' then
+        local position = assert(toVector3(value.position or value), 'Invalid CFrame payload.')
+        return CFrame.new(position)
+    end
+    if typedValue == 'TargetOffsetCFrame' then
+        local targetPath = tostring(value.target_path or '')
+        local target = InstancePath.findByPath(targetPath)
+        assert(target ~= nil, string.format('Target path not found for CFrame: %s', targetPath))
+
+        local offset = assert(toVector3(value.offset), 'Invalid target offset payload.')
+        if target:IsA('Model') then
+            return target:GetPivot() * CFrame.new(offset)
+        end
+
+        if target:IsA('BasePart') then
+            return target.CFrame * CFrame.new(offset)
+        end
+
+        error(string.format('Target path does not support CFrame offsets: %s', targetPath))
+    end
+
+    local vector3Value = toVector3(value)
+    if vector3Value ~= nil then
+        return vector3Value
+    end
+
+    local color3Value = toColor3(value)
+    if color3Value ~= nil then
+        return color3Value
+    end
+
+    if isArray(value) then
+        local decoded = {}
+        for index, item in ipairs(value) do
+            decoded[index] = decodeValue(item)
+        end
+        return decoded
+    end
+
+    local decoded = {}
+    for key, item in pairs(value) do
+        decoded[key] = decodeValue(item)
+    end
+    return decoded
+end
+
+local function applyProperties(instance, properties)
+    for propertyName, value in pairs(properties) do
+        instance[propertyName] = decodeValue(value)
+    end
+end
+
 local function isMutating(kind)
     return kind == 'apply_script_patch'
         or kind == 'create_instance'
@@ -105,10 +219,12 @@ local function createInstance(operation)
     instance.Parent = parent
 
     local properties = operation.payload.properties or {}
-    for propertyName, value in pairs(properties) do
-        pcall(function()
-            instance[propertyName] = value
-        end)
+    local ok, err = pcall(function()
+        applyProperties(instance, properties)
+    end)
+    if not ok then
+        instance:Destroy()
+        return createOutcome(operation.operation_id, false, tostring(err), {})
     end
 
     return createOutcome(operation.operation_id, true, 'Created instance.', {
@@ -122,13 +238,11 @@ local function updateProperties(operation)
         return createOutcome(operation.operation_id, false, 'Target not found.', {})
     end
 
-    for propertyName, value in pairs(operation.payload.properties) do
-        local ok, err = pcall(function()
-            target[propertyName] = value
-        end)
-        if not ok then
-            return createOutcome(operation.operation_id, false, tostring(err), {})
-        end
+    local ok, err = pcall(function()
+        applyProperties(target, operation.payload.properties)
+    end)
+    if not ok then
+        return createOutcome(operation.operation_id, false, tostring(err), {})
     end
 
     return createOutcome(
